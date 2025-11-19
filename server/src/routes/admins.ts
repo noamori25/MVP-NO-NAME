@@ -1,6 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { google } from '@ai-sdk/google';
 import { generateText } from 'ai';
+import { AiRules } from '../AiRules.js';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = Router();
 
@@ -57,10 +64,11 @@ router.post('/send', async (req: Request, res: Response) => {
         messages: messages as any, // Type assertion needed due to SDK type definitions
       });
     } else {
-      // For text only, use prompt
+      // For text only, use prompt with handyman system instructions
       result = await generateText({
         model,
-        prompt: text || 'Hello',
+        system: AiRules.system,
+        prompt: text || 'Hello, how can I help you with your handyman needs today?',
       });
     }
 
@@ -69,6 +77,46 @@ router.post('/send', async (req: Request, res: Response) => {
     console.error('Error calling Gemini API:', error);
     res.status(500).json({
       error: 'Failed to process request',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// GET endpoint to read current AiRules.ts file content
+router.get('/rules', async (req: Request, res: Response) => {
+  try {
+    const rulesFilePath = path.join(__dirname, '..', 'AiRules.ts');
+    const fileContent = await fs.readFile(rulesFilePath, 'utf-8');
+    res.json({ content: fileContent });
+  } catch (error) {
+    console.error('Error reading AiRules.ts:', error);
+    res.status(500).json({
+      error: 'Failed to read rules file',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// POST endpoint to save new content to AiRules.ts file
+router.post('/rules', async (req: Request, res: Response) => {
+  try {
+    const { content } = req.body;
+
+    if (!content || typeof content !== 'string') {
+      return res.status(400).json({ error: 'Content is required and must be a string' });
+    }
+
+    const rulesFilePath = path.join(__dirname, '..', 'AiRules.ts');
+    await fs.writeFile(rulesFilePath, content, 'utf-8');
+
+    res.json({
+      success: true,
+      message: 'File saved successfully! Please restart the server with \'yarn dev\' to apply changes.'
+    });
+  } catch (error) {
+    console.error('Error writing to AiRules.ts:', error);
+    res.status(500).json({
+      error: 'Failed to save rules file',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
