@@ -200,8 +200,16 @@ async function sendMessage() {
   await scrollToBottom();
 
   try {
-    const requestBody: { text: string; image?: string } = {
+    // Build chat history for API (exclude timestamps and only include role + content)
+    const historyForAPI = chatHistory.value.map(msg => ({
+      role: msg.role,
+      content: msg.content,
+      ...(msg.image && { image: msg.image })
+    }));
+
+    const requestBody: { text: string; image?: string; history?: any[] } = {
       text: userMessage,
+      history: historyForAPI,
     };
 
     if (userImage) {

@@ -13,7 +13,7 @@ const router = Router();
 
 router.post('/send', async (req: Request, res: Response) => {
   try {
-    const { text, image } = req.body;
+    const { text, image, history } = req.body;
 
     if (!text && !image) {
       return res.status(400).json({ error: 'Text or image is required' });
@@ -64,11 +64,30 @@ router.post('/send', async (req: Request, res: Response) => {
         messages: messages as any, // Type assertion needed due to SDK type definitions
       });
     } else {
-      // For text only, use prompt with handyman system instructions
+      const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+      if (history && Array.isArray(history) && history.length > 0) {
+        const recentHistory = history.slice(-4, -1);
+        for (const msg of recentHistory) {
+          if (msg.role === 'user' || msg.role === 'assistant') {
+            messages.push({
+              role: msg.role,
+              content: msg.content || '',
+            });
+          }
+        }
+      }
+      messages.push({
+        role: 'user',
+        content: text || 'Hello',
+      });
+
+
+
+
       result = await generateText({
         model,
         system: AiRules.system,
-        prompt: text || 'Hello, how can I help you with your handyman needs today?',
+        messages: messages as any,
       });
     }
 
